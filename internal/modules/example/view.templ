@@ -1,0 +1,22 @@
+package example
+
+import "fmt"
+
+// Page renders the example GET page.
+templ Page(model Model) {
+	<h1>Example Page</h1>
+	<p>Welcome to the example module.</p>
+	<p>Counter: <strong>{ fmt.Sprintf("%d", model.Counter) }</strong></p>
+	if model.LastMsg != "" {
+		<p>Last action: <em>{ model.LastMsg }</em></p>
+	}
+	<hr/>
+	<h2>POST Action</h2>
+	<form method="POST" action="/example/action">
+		<label>
+			Message:
+			<input type="text" name="message" placeholder="type something"/>
+		</label>
+		<button type="submit">Submit</button>
+	</form>
+}

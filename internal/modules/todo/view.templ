@@ -1,0 +1,69 @@
+package todo
+
+// Page renders the full todo list page.
+templ Page(todos []Todo) {
+	<h1>Todo List</h1>
+	<form
+		hx-post="/todo"
+		hx-target="#todo-list"
+		hx-swap="outerHTML"
+		hx-select="#todo-list"
+		hx-on:htmx:after-request="this.reset()"
+		style="display:flex;gap:0.5rem;margin-bottom:1.5rem;"
+	>
+		<input
+			type="text"
+			name="text"
+			placeholder="What needs to be done?"
+			required
+			style="flex:1;padding:0.4rem 0.6rem;font-size:1rem;border:1px solid #ccc;border-radius:4px;"
+		/>
+		<button type="submit" style="padding:0.4rem 1rem;cursor:pointer;">Add</button>
+	</form>
+	@TodoList(todos)
+}
+
+// TodoList renders the swappable todo list fragment.
+// All HTMX operations replace this element (hx-swap="outerHTML" hx-target="#todo-list").
+templ TodoList(todos []Todo) {
+	<div id="todo-list">
+		if len(todos) == 0 {
+			<p style="color:#888;">No todos yet. Add one above!</p>
+		} else {
+			<ul style="list-style:none;padding:0;margin:0 0 1rem;">
+				for _, t := range todos {
+					@TodoItem(t)
+				}
+			</ul>
+			<button
+				hx-post="/todo/clear"
+				hx-target="#todo-list"
+				hx-swap="outerHTML"
+				hx-select="#todo-list"
+				hx-confirm="Clear all todos?"
+				style="padding:0.4rem 1rem;cursor:pointer;"
+			>Clear all</button>
+		}
+	</div>
+}
+
+// TodoItem renders a single todo row.
+templ TodoItem(t Todo) {
+	<li style="display:flex;align-items:center;gap:0.6rem;padding:0.4rem 0;border-bottom:1px solid #eee;">
+		<input
+			type="checkbox"
+			checked?={ t.Done }
+			hx-post={ "/todo/" + t.ID + "/toggle" }
+			hx-target="#todo-list"
+			hx-swap="outerHTML"
+			hx-select="#todo-list"
+			hx-trigger="change"
+			style="width:1.1rem;height:1.1rem;cursor:pointer;"
+		/>
+		if t.Done {
+			<span style="text-decoration:line-through;color:#999;">{ t.Text }</span>
+		} else {
+			<span>{ t.Text }</span>
+		}
+	</li>
+}
