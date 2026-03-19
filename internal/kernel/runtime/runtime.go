@@ -1,9 +1,9 @@
 // Package runtime provides an Elm/Bubble Tea–inspired SSR kernel.
-// A Program is a typed page-level state machine:
+// A Program is a page-level state machine:
 //
-//	Init  → (Model, Cmd)
-//	Update(Model, Msg) → (Model, Cmd)
-//	View(Model) → templ.Component
+//	Init  → (model, Cmd)
+//	Update(model, Msg) → (model, Cmd)
+//	View(model) → templ.Component
 //
 // POST handlers run the update loop, execute commands, and redirect (PRG).
 // GET handlers call Init + View.
@@ -18,25 +18,13 @@ import (
 	"github.com/a-h/templ"
 )
 
-// Cmd is a side-effecting function that returns zero or more follow-up messages.
-// Returning nil (or an empty slice) means "no further messages".
-type Cmd[Msg any] func(ctx context.Context) []Msg
+// Msg is the type of all program messages.  Any value is a valid Msg; nil
+// means "no message" and terminates a Cmd chain.
+type Msg = any
 
-// NoCmd returns a nil Cmd, signalling no side effects.
-func NoCmd[Msg any]() Cmd[Msg] { return nil }
-
-// BatchCmd combines multiple Cmds into one.
-func BatchCmd[Msg any](cmds ...Cmd[Msg]) Cmd[Msg] {
-	return func(ctx context.Context) []Msg {
-		var msgs []Msg
-		for _, c := range cmds {
-			if c != nil {
-				msgs = append(msgs, c(ctx)...)
-			}
-		}
-		return msgs
-	}
-}
+// Cmd is a side-effecting function that produces an optional follow-up message.
+// Returning nil means "no further messages".
+type Cmd func() Msg
 
 // Outcome carries the side-effect decisions a POST program can make.
 // RedirectTo overrides the default Referer redirect; Flashes are stored for the next request.
@@ -55,21 +43,21 @@ type Flash struct {
 }
 
 // Program is the page-level state machine interface.
-// M is the page Model, Msg is the page's local sum type.
-type Program[M any, Msg any] interface {
+// model is an opaque value owned by the program implementation.
+type Program interface {
 	// Init creates the initial model and an optional first command.
-	Init(ctx context.Context, r *http.Request) (M, Cmd[Msg])
+	Init(ctx context.Context, r *http.Request) (model any, cmd Cmd)
 	// Update applies a message to the model and returns the updated model,
 	// an optional next command, and the accumulated Outcome (redirect, flashes).
-	Update(ctx context.Context, model M, msg Msg) (M, Cmd[Msg], Outcome)
+	Update(ctx context.Context, model any, msg Msg) (any, Cmd, Outcome)
 	// View renders the model into a templ Component.
-	View(ctx context.Context, model M) templ.Component
+	View(ctx context.Context, model any) templ.Component
 }
 
 // MsgDecoder decodes an *http.Request into a Msg.
 // Pass one to HandlePost or HandleGet at route-registration time so that
 // programs remain pure state machines with no HTTP awareness.
-type MsgDecoder[Msg any] func(r *http.Request) (Msg, error)
+type MsgDecoder func(r *http.Request) (Msg, error)
 
 // maxLoopIterations is the maximum number of Update/Cmd cycles allowed per
 // request.  This prevents infinite loops caused by a Cmd producing a Msg that
@@ -78,34 +66,31 @@ type MsgDecoder[Msg any] func(r *http.Request) (Msg, error)
 const maxLoopIterations = 32
 
 // Runner executes the Elm-style update/cmd loop for a single HTTP interaction.
-type Runner[M any, Msg any] struct {
-	Program Program[M, Msg]
+type Runner struct {
+	Program Program
 	Logger  *slog.Logger
 }
 
 // NewRunner constructs a Runner for the given Program.
-func NewRunner[M any, Msg any](p Program[M, Msg]) *Runner[M, Msg] {
-	return &Runner[M, Msg]{Program: p, Logger: slog.Default()}
+func NewRunner(p Program) *Runner {
+	return &Runner{Program: p, Logger: slog.Default()}
 }
 
-// RunInit executes Init and returns the model ready for rendering.
-func (r *Runner[M, Msg]) RunInit(ctx context.Context, req *http.Request) (M, error) {
+// RunInit executes Init and drains any initial Cmd chain.
+func (r *Runner) RunInit(ctx context.Context, req *http.Request) (any, error) {
 	model, cmd := r.Program.Init(ctx, req)
 	if cmd == nil {
 		return model, nil
 	}
-	msgs := cmd(ctx)
-	var outcome Outcome
 	var err error
-	model, outcome, err = r.drainMsgs(ctx, model, msgs)
-	_ = outcome // init outcomes (redirects, flashes) are ignored for GET
+	model, _, err = r.drainCmd(ctx, model, cmd)
 	return model, err
 }
 
 // RunInitWithMsg is like RunInit but, after draining the initial Cmd, it
 // decodes a Msg from the request using dec and runs one more Update/Cmd cycle.
 // If dec is nil, it behaves identically to RunInit.
-func (r *Runner[M, Msg]) RunInitWithMsg(ctx context.Context, req *http.Request, dec MsgDecoder[Msg]) (M, error) {
+func (r *Runner) RunInitWithMsg(ctx context.Context, req *http.Request, dec MsgDecoder) (any, error) {
 	model, err := r.RunInit(ctx, req)
 	if err != nil || dec == nil {
 		return model, err
@@ -114,24 +99,25 @@ func (r *Runner[M, Msg]) RunInitWithMsg(ctx context.Context, req *http.Request, 
 	if err != nil {
 		return model, fmt.Errorf("runtime: decode msg: %w", err)
 	}
+	if msg == nil {
+		return model, nil
+	}
 	updatedModel, nextCmd, _ := r.Program.Update(ctx, model, msg)
 	model = updatedModel
 	if nextCmd != nil {
-		msgs := nextCmd(ctx)
-		model, _, err = r.drainMsgs(ctx, model, msgs)
+		model, _, err = r.drainCmd(ctx, model, nextCmd)
 	}
 	return model, err
 }
 
-// RunPostWithModel is like RunPost but also returns the final model so that
-// fragment handlers (e.g. HandleFragment) can call View after the update/cmd loop.
-func (r *Runner[M, Msg]) RunPostWithModel(ctx context.Context, req *http.Request, dec MsgDecoder[Msg]) (M, Outcome, error) {
-	model, cmd := r.Program.Init(ctx, req)
-	if cmd != nil {
-		initMsgs := cmd(ctx)
+// RunPostWithModel runs Init → drain Cmds → decode → Update → drain Cmds and
+// returns the final model so that fragment handlers can call View afterwards.
+func (r *Runner) RunPostWithModel(ctx context.Context, req *http.Request, dec MsgDecoder) (any, Outcome, error) {
+	model, initCmd := r.Program.Init(ctx, req)
+	if initCmd != nil {
 		var err error
 		var o Outcome
-		model, o, err = r.drainMsgs(ctx, model, initMsgs)
+		model, o, err = r.drainCmd(ctx, model, initCmd)
 		if err != nil {
 			return model, o, err
 		}
@@ -139,17 +125,15 @@ func (r *Runner[M, Msg]) RunPostWithModel(ctx context.Context, req *http.Request
 
 	msg, err := dec(req)
 	if err != nil {
-		var zero M
-		return zero, Outcome{}, fmt.Errorf("runtime: decode msg: %w", err)
+		return nil, Outcome{}, fmt.Errorf("runtime: decode msg: %w", err)
 	}
 
 	updatedModel, nextCmd, outcome := r.Program.Update(ctx, model, msg)
 	model = updatedModel
 
 	if nextCmd != nil {
-		msgs := nextCmd(ctx)
 		var moreOutcome Outcome
-		model, moreOutcome, err = r.drainMsgs(ctx, model, msgs)
+		model, moreOutcome, err = r.drainCmd(ctx, model, nextCmd)
 		if err != nil {
 			return model, outcome, err
 		}
@@ -159,59 +143,29 @@ func (r *Runner[M, Msg]) RunPostWithModel(ctx context.Context, req *http.Request
 }
 
 // RunPost executes the decoder → Update → Cmd loop and returns the accumulated Outcome.
-func (r *Runner[M, Msg]) RunPost(ctx context.Context, req *http.Request, dec MsgDecoder[Msg]) (Outcome, error) {
-	model, cmd := r.Program.Init(ctx, req)
-	if cmd != nil {
-		initMsgs := cmd(ctx)
-		var err error
-		var o Outcome
-		model, o, err = r.drainMsgs(ctx, model, initMsgs)
-		if err != nil {
-			return o, err
-		}
-
-	}
-
-	msg, err := dec(req)
-	if err != nil {
-		return Outcome{}, fmt.Errorf("runtime: decode msg: %w", err)
-	}
-
-	updatedModel, nextCmd, outcome := r.Program.Update(ctx, model, msg)
-	model = updatedModel
-
-	if nextCmd != nil {
-		msgs := nextCmd(ctx)
-		var moreOutcome Outcome
-		model, moreOutcome, err = r.drainMsgs(ctx, model, msgs)
-		if err != nil {
-			return outcome, err
-		}
-		outcome = mergeOutcome(outcome, moreOutcome)
-	}
-	_ = model
-	return outcome, nil
+func (r *Runner) RunPost(ctx context.Context, req *http.Request, dec MsgDecoder) (Outcome, error) {
+	_, outcome, err := r.RunPostWithModel(ctx, req, dec)
+	return outcome, err
 }
 
-// drainMsgs processes a slice of messages through the bounded update/cmd loop.
-func (r *Runner[M, Msg]) drainMsgs(ctx context.Context, model M, msgs []Msg) (M, Outcome, error) {
-	var accumulated Outcome
-	queue := msgs
+// drainCmd executes a Cmd and follows the resulting Msg → Update → Cmd chain
+// until a Cmd returns nil or the iteration limit is reached.
+func (r *Runner) drainCmd(ctx context.Context, model any, cmd Cmd) (any, Outcome, error) {
+	accumulated := Outcome{}
 	iterations := 0
-	for len(queue) > 0 {
+	for cmd != nil {
 		if iterations >= maxLoopIterations {
 			return model, accumulated, fmt.Errorf("runtime: update loop exceeded %d iterations", maxLoopIterations)
 		}
-		msg := queue[0]
-		queue = queue[1:]
-		var cmd Cmd[Msg]
-		var outcome Outcome
-		model, cmd, outcome = r.Program.Update(ctx, model, msg)
-		accumulated = mergeOutcome(accumulated, outcome)
-		if cmd != nil {
-			more := cmd(ctx)
-			queue = append(queue, more...)
+		msg := cmd()
+		if msg == nil {
+			break
 		}
+		var outcome Outcome
+		var nextCmd Cmd
+		model, nextCmd, outcome = r.Program.Update(ctx, model, msg)
+		accumulated = mergeOutcome(accumulated, outcome)
+		cmd = nextCmd
 		iterations++
 	}
 	return model, accumulated, nil

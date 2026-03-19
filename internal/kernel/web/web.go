@@ -61,16 +61,16 @@ func SetRenderer(r Renderer) { DefaultRenderer = r }
 // wrapped in the application shell via DefaultRenderer.
 // An optional dec may be provided; if non-nil it is called after Init and the
 // resulting Msg is fed through one Update/Cmd cycle before View is called.
-func HandleGet[M any, Msg any](p runtime.Program[M, Msg], dec ...runtime.MsgDecoder[Msg]) http.HandlerFunc {
+func HandleGet(p runtime.Program, dec ...runtime.MsgDecoder) http.HandlerFunc {
 	return HandleGetWith(DefaultRenderer, p, dec...)
 }
 
 // HandleGetWith is like HandleGet but uses the provided Renderer instead of DefaultRenderer.
-func HandleGetWith[M any, Msg any](rend Renderer, p runtime.Program[M, Msg], dec ...runtime.MsgDecoder[Msg]) http.HandlerFunc {
+func HandleGetWith(rend Renderer, p runtime.Program, dec ...runtime.MsgDecoder) http.HandlerFunc {
 	if rend == nil {
 		panic("web: HandleGetWith called with nil Renderer; call web.SetRenderer before registering routes")
 	}
-	var decoder runtime.MsgDecoder[Msg]
+	var decoder runtime.MsgDecoder
 	if len(dec) > 0 {
 		decoder = dec[0]
 	}
@@ -106,12 +106,12 @@ func isHTMXRequest(r *http.Request) bool {
 //     using Outcome.RedirectTo, the Referer header, or "/" as fallback.
 //
 // dec is called on every POST request to decode the request into a Msg.
-func HandlePost[M any, Msg any](p runtime.Program[M, Msg], dec runtime.MsgDecoder[Msg]) http.HandlerFunc {
+func HandlePost(p runtime.Program, dec runtime.MsgDecoder) http.HandlerFunc {
 	return HandlePostWith(DefaultRenderer, p, dec)
 }
 
 // HandlePostWith is like HandlePost but uses the provided Renderer instead of DefaultRenderer.
-func HandlePostWith[M any, Msg any](rend Renderer, p runtime.Program[M, Msg], dec runtime.MsgDecoder[Msg]) http.HandlerFunc {
+func HandlePostWith(rend Renderer, p runtime.Program, dec runtime.MsgDecoder) http.HandlerFunc {
 	if rend == nil {
 		panic("web: HandlePostWith called with nil Renderer; call web.SetRenderer before registering routes")
 	}

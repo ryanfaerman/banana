@@ -8,6 +8,7 @@ import (
 
 	"github.com/ryanfaerman/banana/internal/kernel/access"
 	"github.com/ryanfaerman/banana/internal/kernel/menu"
+	rt "github.com/ryanfaerman/banana/internal/kernel/runtime"
 	"github.com/ryanfaerman/banana/internal/kernel/web"
 )
 
@@ -38,7 +39,7 @@ func registerRoutes(r chi.Router) {
 
 	// POST /example/action – also private.
 	postAccess := access.Private()
-	r.With(access.Middleware(postAccess)...).Post("/example/action", web.HandlePost(prog, func(r *http.Request) (Msg, error) {
+	r.With(access.Middleware(postAccess)...).Post("/example/action", web.HandlePost(prog, func(r *http.Request) (rt.Msg, error) {
 		if err := r.ParseForm(); err != nil {
 			return nil, fmt.Errorf("example: parse form: %w", err)
 		}

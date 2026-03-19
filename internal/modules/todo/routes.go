@@ -8,6 +8,7 @@ import (
 
 	"github.com/ryanfaerman/banana/internal/kernel/access"
 	"github.com/ryanfaerman/banana/internal/kernel/menu"
+	rt "github.com/ryanfaerman/banana/internal/kernel/runtime"
 	"github.com/ryanfaerman/banana/internal/kernel/web"
 )
 
@@ -39,17 +40,17 @@ func registerRoutes(r chi.Router) {
 	// web.HandlePost detects HX-Request and either renders the View as a
 	// fragment (HTMX, using hx-select to extract #todo-list) or performs a
 	// PRG redirect.
-	r.Post("/todo", web.HandlePost(program, func(r *http.Request) (Msg, error) {
+	r.Post("/todo", web.HandlePost(program, func(r *http.Request) (rt.Msg, error) {
 		if err := r.ParseForm(); err != nil {
 			return nil, fmt.Errorf("todo: parse form: %w", err)
 		}
 		return AddRequested{Text: r.FormValue("text")}, nil
 	}))
-	r.Post("/todo/clear", web.HandlePost(program, func(_ *http.Request) (Msg, error) {
+	r.Post("/todo/clear", web.HandlePost(program, func(_ *http.Request) (rt.Msg, error) {
 		return ClearRequested{}, nil
 	}))
-	r.Post("/todo/{id}/toggle", web.HandlePost(program, func(r *http.Request) (Msg, error) {
-		return ToggleRequested{ID: chi.URLParam(r, "id")}, nil
+	r.Post("/todo/{id}/toggle", web.HandlePost(program, func(r *http.Request) (rt.Msg, error) {
+		return ToggleRequested{ID: chi.URLParamFromCtx(r.Context(), "id")}, nil
 	}))
 }
 

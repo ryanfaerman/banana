@@ -25,51 +25,32 @@ type Model struct {
 }
 
 // ---------------------------------------------------------------------------
-// Msg (unified sum type)
+// Messages
 // ---------------------------------------------------------------------------
-
-// Msg is the sealed interface for all todo messages.
-type Msg interface{ isTodoMsg() }
 
 // PageOpened is sent by Init; triggers loading todos from the store.
 type PageOpened struct{}
 
-func (PageOpened) isTodoMsg() {}
-
 // TodosLoaded carries the todos retrieved from the store.
 type TodosLoaded struct{ Todos []Todo }
-
-func (TodosLoaded) isTodoMsg() {}
 
 // AddRequested carries the new todo text from POST /todo.
 type AddRequested struct{ Text string }
 
-func (AddRequested) isTodoMsg() {}
-
 // AddCompleted carries the refreshed todo list after adding.
 type AddCompleted struct{ Todos []Todo }
-
-func (AddCompleted) isTodoMsg() {}
 
 // ToggleRequested carries the ID of the todo to flip from POST /todo/{id}/toggle.
 type ToggleRequested struct{ ID string }
 
-func (ToggleRequested) isTodoMsg() {}
-
 // ToggleCompleted carries the refreshed list after the toggle.
 type ToggleCompleted struct{ Todos []Todo }
-
-func (ToggleCompleted) isTodoMsg() {}
 
 // ClearRequested triggers clearing all todos from POST /todo/clear.
 type ClearRequested struct{}
 
-func (ClearRequested) isTodoMsg() {}
-
 // ClearCompleted carries the (now empty) refreshed list.
 type ClearCompleted struct{ Todos []Todo }
-
-func (ClearCompleted) isTodoMsg() {}
 
 // ---------------------------------------------------------------------------
 // Program – GET /todo, POST /todo, POST /todo/clear, POST /todo/{id}/toggle
@@ -80,31 +61,28 @@ type Program struct{ Store *Store }
 
 // Init starts with an empty model and immediately sends PageOpened to trigger
 // loading todos from the store.
-func (p Program) Init(_ context.Context, _ *http.Request) (Model, rt.Cmd[Msg]) {
-	return Model{}, func(_ context.Context) []Msg {
-		return []Msg{PageOpened{}}
-	}
+func (p Program) Init(_ context.Context, _ *http.Request) (any, rt.Cmd) {
+	return Model{}, func() rt.Msg { return PageOpened{} }
 }
 
 // Update handles all todo messages.
-func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, rt.Cmd[Msg], rt.Outcome) {
+func (p Program) Update(_ context.Context, model any, msg rt.Msg) (any, rt.Cmd, rt.Outcome) {
+	m := model.(Model)
 	switch msg := msg.(type) {
 	case PageOpened:
 		store := p.Store
-		return m, func(_ context.Context) []Msg {
-			return []Msg{TodosLoaded{Todos: store.List()}}
-		}, rt.Outcome{}
+		return m, func() rt.Msg { return TodosLoaded{Todos: store.List()} }, rt.Outcome{}
 	case TodosLoaded:
 		m.Todos = msg.Todos
 		return m, nil, rt.Outcome{}
 	case AddRequested:
 		store := p.Store
 		text := msg.Text
-		return m, func(_ context.Context) []Msg {
+		return m, func() rt.Msg {
 			if text != "" {
 				store.Add(text)
 			}
-			return []Msg{AddCompleted{Todos: store.List()}}
+			return AddCompleted{Todos: store.List()}
 		}, rt.Outcome{}
 	case AddCompleted:
 		m.Todos = msg.Todos
@@ -112,18 +90,18 @@ func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, rt.Cmd[Msg]
 	case ToggleRequested:
 		store := p.Store
 		id := msg.ID
-		return m, func(_ context.Context) []Msg {
+		return m, func() rt.Msg {
 			store.Toggle(id)
-			return []Msg{ToggleCompleted{Todos: store.List()}}
+			return ToggleCompleted{Todos: store.List()}
 		}, rt.Outcome{}
 	case ToggleCompleted:
 		m.Todos = msg.Todos
 		return m, nil, rt.Outcome{}
 	case ClearRequested:
 		store := p.Store
-		return m, func(_ context.Context) []Msg {
+		return m, func() rt.Msg {
 			store.Clear()
-			return []Msg{ClearCompleted{Todos: store.List()}}
+			return ClearCompleted{Todos: store.List()}
 		}, rt.Outcome{}
 	case ClearCompleted:
 		m.Todos = msg.Todos
@@ -137,7 +115,6 @@ func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, rt.Cmd[Msg]
 // For HTMX POST requests HandlePost returns this directly; the templates use
 // hx-select="#todo-list" so HTMX extracts just the list fragment from the
 // full-page response.
-func (p Program) View(_ context.Context, m Model) templ.Component {
-	return Page(m.Todos)
+func (p Program) View(_ context.Context, model any) templ.Component {
+	return Page(model.(Model).Todos)
 }
-

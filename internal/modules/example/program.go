@@ -2,7 +2,7 @@
 //
 // It provides:
 //   - A GET page program that renders within the kernel shell.
-//   - A POST action that produces a Cmd → []Msg → Update cycle, sets a flash
+//   - A POST action that produces a Cmd → Msg → Update cycle, sets a flash
 //     message stub, and redirects back to the page.
 //   - Menu registration.
 //   - Route access marking (private).
@@ -29,47 +29,37 @@ type Model struct {
 }
 
 // ---------------------------------------------------------------------------
-// Msg  (local sum type)
+// Messages
 // ---------------------------------------------------------------------------
-
-// Msg is the sealed interface for all example page messages.
-type Msg interface{ isExampleMsg() }
 
 // PageOpened is sent when the page loads (via Init).
 type PageOpened struct{}
 
-func (PageOpened) isExampleMsg() {}
-
 // ActionSubmitted is the POST form message.
 type ActionSubmitted struct{ Message string }
 
-func (ActionSubmitted) isExampleMsg() {}
-
 // CounterIncremented is produced by the Cmd after ActionSubmitted.
 type CounterIncremented struct{}
-
-func (CounterIncremented) isExampleMsg() {}
 
 // ---------------------------------------------------------------------------
 // Program implementation
 // ---------------------------------------------------------------------------
 
-// Program implements rt.Program[Model, Msg] for the example page.
+// Program implements rt.Program for the example page.
 type Program struct {
 	Store *Store
 }
 
 // Init loads persisted state from the store and sends PageOpened.
-func (p Program) Init(_ context.Context, _ *http.Request) (Model, rt.Cmd[Msg]) {
+func (p Program) Init(_ context.Context, _ *http.Request) (any, rt.Cmd) {
 	model := p.Store.Load()
-	return model, func(_ context.Context) []Msg {
-		return []Msg{PageOpened{}}
-	}
+	return model, func() rt.Msg { return PageOpened{} }
 }
 
 // Update handles messages and returns the updated model, optional next Cmd,
 // and any Outcome (redirect, flashes).
-func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, rt.Cmd[Msg], rt.Outcome) {
+func (p Program) Update(_ context.Context, model any, msg rt.Msg) (any, rt.Cmd, rt.Outcome) {
+	m := model.(Model)
 	switch msg := msg.(type) {
 	case PageOpened:
 		// nothing to do on initial open
@@ -78,9 +68,7 @@ func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, rt.Cmd[Msg]
 	case ActionSubmitted:
 		m.LastMsg = msg.Message
 		// Return a Cmd that produces CounterIncremented.
-		cmd := func(_ context.Context) []Msg {
-			return []Msg{CounterIncremented{}}
-		}
+		cmd := func() rt.Msg { return CounterIncremented{} }
 		outcome := rt.Outcome{
 			// Redirect to the page itself (could be left empty to use Referer).
 			RedirectTo: "/example",
@@ -94,7 +82,7 @@ func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, rt.Cmd[Msg]
 		m.Counter++
 		// Persist updated model to the store as a side effect (Cmd).
 		store := p.Store
-		return m, func(_ context.Context) []Msg {
+		return m, func() rt.Msg {
 			store.Save(m)
 			return nil
 		}, rt.Outcome{}
@@ -103,6 +91,6 @@ func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, rt.Cmd[Msg]
 }
 
 // View renders the model into a templ Component.
-func (p Program) View(_ context.Context, m Model) templ.Component {
-	return Page(m)
+func (p Program) View(_ context.Context, model any) templ.Component {
+	return Page(model.(Model))
 }
