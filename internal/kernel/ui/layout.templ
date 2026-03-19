@@ -1,0 +1,49 @@
+package ui
+
+import (
+	"github.com/ryanfaerman/banana/internal/kernel/menu"
+)
+
+// Shell renders the full app shell: HTML boilerplate, nav, and the page body.
+templ Shell(title string, menus []menu.Item, body templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title }</title>
+			<!-- CSS hook: add your stylesheet link here -->
+			<style>
+				body { font-family: sans-serif; margin: 0; }
+				nav { background: #1a1a2e; padding: 0.75rem 1.5rem; display: flex; gap: 1.5rem; }
+				nav a { color: #eee; text-decoration: none; font-size: 0.95rem; }
+				nav a:hover { text-decoration: underline; }
+				main { padding: 2rem; }
+				.flash { background: #d4edda; border: 1px solid #c3e6cb; padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 4px; }
+			</style>
+		</head>
+		<body>
+			<nav>
+				for _, item := range menus {
+					<a href={ templ.SafeURL(item.Href) }>{ item.Label }</a>
+				}
+			</nav>
+			<main>
+				@body
+			</main>
+		</body>
+	</html>
+}
+
+// FlashList renders a list of flash messages.
+templ FlashList(flashes []Flash) {
+	for _, f := range flashes {
+		<div class={ "flash flash-" + f.Level }>{ f.Message }</div>
+	}
+}
+
+// Flash mirrors tea.Flash so the ui package has no import cycle.
+type Flash struct {
+	Level   string
+	Message string
+}
