@@ -87,35 +87,17 @@ func HandleGetWith[M any, Msg any](rend Renderer, p runtime.Program[M, Msg]) htt
 	}
 }
 
-// HandleFragment returns an http.HandlerFunc that runs the update/cmd loop for
-// a POST request and renders the program's View as an HTML fragment (no redirect).
-// Use this for HTMX endpoints that update part of the page in-place.
-func HandleFragment[M any, Msg any](p runtime.PostProgram[M, Msg]) http.HandlerFunc {
-	return HandleFragmentWith(DefaultRenderer, p)
+// isHTMXRequest reports whether the request originated from HTMX.
+// HTMX sets the "HX-Request: true" header on every request it makes.
+func isHTMXRequest(r *http.Request) bool {
+	return r.Header.Get("HX-Request") == "true"
 }
 
-// HandleFragmentWith is like HandleFragment but uses the provided Renderer instead of DefaultRenderer.
-func HandleFragmentWith[M any, Msg any](rend Renderer, p runtime.PostProgram[M, Msg]) http.HandlerFunc {
-	if rend == nil {
-		panic("web: HandleFragmentWith called with nil Renderer; call web.SetRenderer before registering routes")
-	}
-	runner := runtime.NewRunner(p)
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		model, _, err := runner.RunPostWithModel(ctx, r, p)
-		if err != nil {
-			http.Error(w, "internal server error: post: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if err := rend.RenderPageFragment(ctx, w, r, p.View(ctx, model)); err != nil {
-			http.Error(w, "render error: "+err.Error(), http.StatusInternalServerError)
-		}
-	}
-}
-
-// HandlePost returns an http.HandlerFunc that runs the update/cmd loop and
-// redirects (PRG).  The program's Outcome.RedirectTo is used if set; otherwise
-// the request's Referer header is used; finally "/" is the fallback.
+// HandlePost returns an http.HandlerFunc that adapts its response to the caller:
+//   - HTMX requests (HX-Request: true): run the update/cmd loop, then render
+//     the program's View as an HTML fragment so HTMX can swap it in-place.
+//   - Normal requests: run the update/cmd loop, then perform a PRG redirect
+//     using Outcome.RedirectTo, the Referer header, or "/" as fallback.
 func HandlePost[M any, Msg any](p runtime.PostProgram[M, Msg]) http.HandlerFunc {
 	return HandlePostWith(DefaultRenderer, p)
 }
@@ -128,9 +110,16 @@ func HandlePostWith[M any, Msg any](rend Renderer, p runtime.PostProgram[M, Msg]
 	runner := runtime.NewRunner(p)
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		outcome, err := runner.RunPost(ctx, r, p)
+		model, outcome, err := runner.RunPostWithModel(ctx, r, p)
 		if err != nil {
 			http.Error(w, "internal server error: post: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if isHTMXRequest(r) {
+			if err := rend.RenderPageFragment(ctx, w, r, p.View(ctx, model)); err != nil {
+				http.Error(w, "render error: "+err.Error(), http.StatusInternalServerError)
+			}
 			return
 		}
 
