@@ -109,6 +109,41 @@ func (r *Runner[M, Msg]) RunInit(ctx context.Context, req *http.Request) (M, err
 	return model, err
 }
 
+// RunPostWithModel is like RunPost but also returns the final model so that
+// fragment handlers (e.g. HandleFragment) can call View after the update/cmd loop.
+func (r *Runner[M, Msg]) RunPostWithModel(ctx context.Context, req *http.Request, dec Decoder[Msg]) (M, Outcome, error) {
+	model, cmd := r.Program.Init(ctx, req)
+	if cmd != nil {
+		initMsgs := cmd(ctx)
+		var err error
+		var o Outcome
+		model, o, err = r.drainMsgs(ctx, model, initMsgs)
+		if err != nil {
+			return model, o, err
+		}
+	}
+
+	msg, err := dec.DecodeMsg(req)
+	if err != nil {
+		var zero M
+		return zero, Outcome{}, fmt.Errorf("runtime: decode msg: %w", err)
+	}
+
+	updatedModel, nextCmd, outcome := r.Program.Update(ctx, model, msg)
+	model = updatedModel
+
+	if nextCmd != nil {
+		msgs := nextCmd(ctx)
+		var moreOutcome Outcome
+		model, moreOutcome, err = r.drainMsgs(ctx, model, msgs)
+		if err != nil {
+			return model, outcome, err
+		}
+		outcome = mergeOutcome(outcome, moreOutcome)
+	}
+	return model, outcome, nil
+}
+
 // RunPost executes DecodeMsg → Update → Cmd loop and returns the accumulated Outcome.
 func (r *Runner[M, Msg]) RunPost(ctx context.Context, req *http.Request, dec Decoder[Msg]) (Outcome, error) {
 	model, cmd := r.Program.Init(ctx, req)
