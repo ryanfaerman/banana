@@ -12,6 +12,7 @@ import (
 
 	"github.com/ryanfaerman/banana/internal/kernel/web"
 	"github.com/ryanfaerman/banana/internal/modules/example"
+	"github.com/ryanfaerman/banana/internal/modules/todo"
 	"github.com/ryanfaerman/banana/internal/ui/defaultui"
 )
 
@@ -39,6 +40,7 @@ func main() {
 
 	// Register modules.
 	example.Register(r)
+	todo.Register(r)
 
 	slog.Info("starting server", "addr", addr)
 	if err := http.ListenAndServe(addr, r); err != nil {

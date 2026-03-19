@@ -50,7 +50,7 @@ func shell(title string, menus []web.MenuItem, body templ.Component, flashes []r
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</title><!-- CSS hook: add your stylesheet link here --><style>\n\t\t\t\tbody { font-family: sans-serif; margin: 0; }\n\t\t\t\tnav { background: #1a1a2e; padding: 0.75rem 1.5rem; display: flex; gap: 1.5rem; }\n\t\t\t\tnav a { color: #eee; text-decoration: none; font-size: 0.95rem; }\n\t\t\t\tnav a:hover { text-decoration: underline; }\n\t\t\t\tmain { padding: 2rem; }\n\t\t\t\t.flash { background: #d4edda; border: 1px solid #c3e6cb; padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 4px; }\n\t\t\t</style></head><body><nav>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</title><script src=\"https://unpkg.com/htmx.org@2.0.4\" integrity=\"sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+\" crossorigin=\"anonymous\"></script><!-- CSS hook: add your stylesheet link here --><style>\n\t\t\t\tbody { font-family: sans-serif; margin: 0; }\n\t\t\t\tnav { background: #1a1a2e; padding: 0.75rem 1.5rem; display: flex; gap: 1.5rem; }\n\t\t\t\tnav a { color: #eee; text-decoration: none; font-size: 0.95rem; }\n\t\t\t\tnav a:hover { text-decoration: underline; }\n\t\t\t\tmain { padding: 2rem; }\n\t\t\t\t.flash { background: #d4edda; border: 1px solid #c3e6cb; padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 4px; }\n\t\t\t</style></head><body><nav>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -62,7 +62,7 @@ func shell(title string, menus []web.MenuItem, body templ.Component, flashes []r
 			var templ_7745c5c3_Var3 templ.SafeURL
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/defaultui/layout.templ`, Line: 31, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/defaultui/layout.templ`, Line: 32, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -75,7 +75,7 @@ func shell(title string, menus []web.MenuItem, body templ.Component, flashes []r
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/defaultui/layout.templ`, Line: 31, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/defaultui/layout.templ`, Line: 32, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -116,7 +116,7 @@ func shell(title string, menus []web.MenuItem, body templ.Component, flashes []r
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(f.Message)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/defaultui/layout.templ`, Line: 36, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/defaultui/layout.templ`, Line: 37, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
