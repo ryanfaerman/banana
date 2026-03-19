@@ -1,10 +1,8 @@
 // Package todo is a demonstration module providing a simple todo list.
 //
 // It provides:
-//   - A full-page GET (PageProgram) that lists todos with checkboxes.
-//   - A single HTMX-aware POST Program that handles add, toggle, and clear
-//     mutations through the Msg/Cmd/Update cycle, persists to the store via
-//     Cmds, and renders the updated list fragment.
+//   - A single Program that handles both GET (full page) and POST (add,
+//     toggle, clear) operations through the Msg/Cmd/Update cycle.
 //   - Persistence across page refreshes via an in-memory store.
 package todo
 
@@ -18,7 +16,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Shared model
+// Model
 // ---------------------------------------------------------------------------
 
 // Model is the page-local state for the todo module.
@@ -27,107 +25,86 @@ type Model struct {
 }
 
 // ---------------------------------------------------------------------------
-// PageProgram – GET /todo
+// Msg (unified sum type)
 // ---------------------------------------------------------------------------
 
-// PageMsg is the sealed interface for PageProgram messages.
-type PageMsg interface{ isPageMsg() }
+// Msg is the sealed interface for all todo messages.
+type Msg interface{ isTodoMsg() }
 
 // PageOpened is sent by Init; triggers loading todos from the store.
 type PageOpened struct{}
 
-func (PageOpened) isPageMsg() {}
+func (PageOpened) isTodoMsg() {}
 
 // TodosLoaded carries the todos retrieved from the store.
 type TodosLoaded struct{ Todos []Todo }
 
-func (TodosLoaded) isPageMsg() {}
+func (TodosLoaded) isTodoMsg() {}
 
-// PageProgram renders the full todo page.
-type PageProgram struct{ Store *Store }
-
-// Init starts with an empty model and immediately sends PageOpened.
-func (p PageProgram) Init(_ context.Context, _ *http.Request) (Model, rt.Cmd[PageMsg]) {
-	return Model{}, func(_ context.Context) []PageMsg {
-		return []PageMsg{PageOpened{}}
-	}
-}
-
-// Update loads todos on PageOpened, then populates the model on TodosLoaded.
-func (p PageProgram) Update(_ context.Context, m Model, msg PageMsg) (Model, rt.Cmd[PageMsg], rt.Outcome) {
-	switch msg.(type) {
-	case PageOpened:
-		store := p.Store
-		return m, func(_ context.Context) []PageMsg {
-			return []PageMsg{TodosLoaded{Todos: store.List()}}
-		}, rt.Outcome{}
-	case TodosLoaded:
-		m.Todos = msg.(TodosLoaded).Todos
-		return m, nil, rt.Outcome{}
-	}
-	return m, nil, rt.Outcome{}
-}
-
-// View renders the full todo page inside the application shell.
-func (p PageProgram) View(_ context.Context, m Model) templ.Component {
-	return Page(m.Todos)
-}
-
-// ---------------------------------------------------------------------------
-// Program – POST /todo, POST /todo/clear, POST /todo/{id}/toggle
-// ---------------------------------------------------------------------------
-
-// PostMsg is the sealed interface for Program messages.
-type PostMsg interface{ isPostMsg() }
-
-// AddRequested is decoded from POST /todo; carries the new todo text.
+// AddRequested carries the new todo text from POST /todo.
 type AddRequested struct{ Text string }
 
-func (AddRequested) isPostMsg() {}
+func (AddRequested) isTodoMsg() {}
 
 // AddCompleted carries the refreshed todo list after adding.
 type AddCompleted struct{ Todos []Todo }
 
-func (AddCompleted) isPostMsg() {}
+func (AddCompleted) isTodoMsg() {}
 
-// ToggleRequested carries the ID of the todo to flip, decoded from POST /todo/{id}/toggle.
+// ToggleRequested carries the ID of the todo to flip from POST /todo/{id}/toggle.
 type ToggleRequested struct{ ID string }
 
-func (ToggleRequested) isPostMsg() {}
+func (ToggleRequested) isTodoMsg() {}
 
 // ToggleCompleted carries the refreshed list after the toggle.
 type ToggleCompleted struct{ Todos []Todo }
 
-func (ToggleCompleted) isPostMsg() {}
+func (ToggleCompleted) isTodoMsg() {}
 
-// ClearRequested triggers clearing all todos, decoded from POST /todo/clear.
+// ClearRequested triggers clearing all todos from POST /todo/clear.
 type ClearRequested struct{}
 
-func (ClearRequested) isPostMsg() {}
+func (ClearRequested) isTodoMsg() {}
 
 // ClearCompleted carries the (now empty) refreshed list.
 type ClearCompleted struct{ Todos []Todo }
 
-func (ClearCompleted) isPostMsg() {}
+func (ClearCompleted) isTodoMsg() {}
 
-// Program handles all todo POST mutations: add, toggle, and clear.
+// ---------------------------------------------------------------------------
+// Program – GET /todo, POST /todo, POST /todo/clear, POST /todo/{id}/toggle
+// ---------------------------------------------------------------------------
+
+// Program handles all todo operations: page load, add, toggle, and clear.
 type Program struct{ Store *Store }
 
-func (p Program) Init(_ context.Context, _ *http.Request) (Model, rt.Cmd[PostMsg]) {
-	return Model{}, nil
+// Init starts with an empty model and immediately sends PageOpened to trigger
+// loading todos from the store.
+func (p Program) Init(_ context.Context, _ *http.Request) (Model, rt.Cmd[Msg]) {
+	return Model{}, func(_ context.Context) []Msg {
+		return []Msg{PageOpened{}}
+	}
 }
 
-// Update handles all todo mutations.
-func (p Program) Update(_ context.Context, m Model, msg PostMsg) (Model, rt.Cmd[PostMsg], rt.Outcome) {
+// Update handles all todo messages.
+func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, rt.Cmd[Msg], rt.Outcome) {
 	switch msg := msg.(type) {
+	case PageOpened:
+		store := p.Store
+		return m, func(_ context.Context) []Msg {
+			return []Msg{TodosLoaded{Todos: store.List()}}
+		}, rt.Outcome{}
+	case TodosLoaded:
+		m.Todos = msg.Todos
+		return m, nil, rt.Outcome{}
 	case AddRequested:
 		store := p.Store
 		text := msg.Text
-		return m, func(_ context.Context) []PostMsg {
+		return m, func(_ context.Context) []Msg {
 			if text != "" {
 				store.Add(text)
 			}
-			return []PostMsg{AddCompleted{Todos: store.List()}}
+			return []Msg{AddCompleted{Todos: store.List()}}
 		}, rt.Outcome{}
 	case AddCompleted:
 		m.Todos = msg.Todos
@@ -135,18 +112,18 @@ func (p Program) Update(_ context.Context, m Model, msg PostMsg) (Model, rt.Cmd[
 	case ToggleRequested:
 		store := p.Store
 		id := msg.ID
-		return m, func(_ context.Context) []PostMsg {
+		return m, func(_ context.Context) []Msg {
 			store.Toggle(id)
-			return []PostMsg{ToggleCompleted{Todos: store.List()}}
+			return []Msg{ToggleCompleted{Todos: store.List()}}
 		}, rt.Outcome{}
 	case ToggleCompleted:
 		m.Todos = msg.Todos
 		return m, nil, rt.Outcome{}
 	case ClearRequested:
 		store := p.Store
-		return m, func(_ context.Context) []PostMsg {
+		return m, func(_ context.Context) []Msg {
 			store.Clear()
-			return []PostMsg{ClearCompleted{Todos: store.List()}}
+			return []Msg{ClearCompleted{Todos: store.List()}}
 		}, rt.Outcome{}
 	case ClearCompleted:
 		m.Todos = msg.Todos
@@ -155,8 +132,12 @@ func (p Program) Update(_ context.Context, m Model, msg PostMsg) (Model, rt.Cmd[
 	return m, nil, rt.Outcome{}
 }
 
-// View renders the todo list fragment (used by HandlePost for HTMX responses).
+// View renders the full todo page.
+// For GET requests this is wrapped in the application shell by HandleGet.
+// For HTMX POST requests HandlePost returns this directly; the templates use
+// hx-select="#todo-list" so HTMX extracts just the list fragment from the
+// full-page response.
 func (p Program) View(_ context.Context, m Model) templ.Component {
-	return TodoList(m.Todos)
+	return Page(m.Todos)
 }
 

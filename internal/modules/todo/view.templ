@@ -7,6 +7,7 @@ templ Page(todos []Todo) {
 		hx-post="/todo"
 		hx-target="#todo-list"
 		hx-swap="outerHTML"
+		hx-select="#todo-list"
 		hx-on:htmx:after-request="this.reset()"
 		style="display:flex;gap:0.5rem;margin-bottom:1.5rem;"
 	>
@@ -38,6 +39,7 @@ templ TodoList(todos []Todo) {
 				hx-post="/todo/clear"
 				hx-target="#todo-list"
 				hx-swap="outerHTML"
+				hx-select="#todo-list"
 				hx-confirm="Clear all todos?"
 				style="padding:0.4rem 1rem;cursor:pointer;"
 			>Clear all</button>
@@ -54,6 +56,7 @@ templ TodoItem(t Todo) {
 			hx-post={ "/todo/" + t.ID + "/toggle" }
 			hx-target="#todo-list"
 			hx-swap="outerHTML"
+			hx-select="#todo-list"
 			hx-trigger="change"
 			style="width:1.1rem;height:1.1rem;cursor:pointer;"
 		/>

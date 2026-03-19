@@ -30,7 +30,7 @@ func Page(todos []Todo) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<h1>Todo List</h1><form hx-post=\"/todo\" hx-target=\"#todo-list\" hx-swap=\"outerHTML\" hx-on:htmx:after-request=\"this.reset()\" style=\"display:flex;gap:0.5rem;margin-bottom:1.5rem;\"><input type=\"text\" name=\"text\" placeholder=\"What needs to be done?\" required style=\"flex:1;padding:0.4rem 0.6rem;font-size:1rem;border:1px solid #ccc;border-radius:4px;\"> <button type=\"submit\" style=\"padding:0.4rem 1rem;cursor:pointer;\">Add</button></form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<h1>Todo List</h1><form hx-post=\"/todo\" hx-target=\"#todo-list\" hx-swap=\"outerHTML\" hx-select=\"#todo-list\" hx-on:htmx:after-request=\"this.reset()\" style=\"display:flex;gap:0.5rem;margin-bottom:1.5rem;\"><input type=\"text\" name=\"text\" placeholder=\"What needs to be done?\" required style=\"flex:1;padding:0.4rem 0.6rem;font-size:1rem;border:1px solid #ccc;border-radius:4px;\"> <button type=\"submit\" style=\"padding:0.4rem 1rem;cursor:pointer;\">Add</button></form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -85,7 +85,7 @@ func TodoList(todos []Todo) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</ul><button hx-post=\"/todo/clear\" hx-target=\"#todo-list\" hx-swap=\"outerHTML\" hx-confirm=\"Clear all todos?\" style=\"padding:0.4rem 1rem;cursor:pointer;\">Clear all</button>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</ul><button hx-post=\"/todo/clear\" hx-target=\"#todo-list\" hx-swap=\"outerHTML\" hx-select=\"#todo-list\" hx-confirm=\"Clear all todos?\" style=\"padding:0.4rem 1rem;cursor:pointer;\">Clear all</button>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -137,13 +137,13 @@ func TodoItem(t Todo) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs("/todo/" + t.ID + "/toggle")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/modules/todo/view.templ`, Line: 54, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/modules/todo/view.templ`, Line: 56, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" hx-target=\"#todo-list\" hx-swap=\"outerHTML\" hx-trigger=\"change\" style=\"width:1.1rem;height:1.1rem;cursor:pointer;\"> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" hx-target=\"#todo-list\" hx-swap=\"outerHTML\" hx-select=\"#todo-list\" hx-trigger=\"change\" style=\"width:1.1rem;height:1.1rem;cursor:pointer;\"> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -155,7 +155,7 @@ func TodoItem(t Todo) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(t.Text)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/modules/todo/view.templ`, Line: 61, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/modules/todo/view.templ`, Line: 64, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -173,7 +173,7 @@ func TodoItem(t Todo) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(t.Text)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/modules/todo/view.templ`, Line: 63, Col: 17}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/modules/todo/view.templ`, Line: 66, Col: 17}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
