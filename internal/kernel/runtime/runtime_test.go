@@ -52,10 +52,6 @@ func (testProgram) View(_ context.Context, _ testModel) templ.Component {
 	})
 }
 
-func (testProgram) DecodeMsg(_ *http.Request) (testMsg, error) {
-	return incrementMsg{}, nil
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -76,7 +72,9 @@ func TestRunPost_updateCmdLoop(t *testing.T) {
 	prog := testProgram{}
 	runner := runtime.NewRunner[testModel, testMsg](prog)
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
-	outcome, err := runner.RunPost(context.Background(), req, prog)
+	outcome, err := runner.RunPost(context.Background(), req, func(_ *http.Request) (testMsg, error) {
+		return incrementMsg{}, nil
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

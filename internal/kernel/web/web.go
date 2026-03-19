@@ -59,19 +59,25 @@ func SetRenderer(r Renderer) { DefaultRenderer = r }
 
 // HandleGet returns an http.HandlerFunc that runs Init → View for the program,
 // wrapped in the application shell via DefaultRenderer.
-func HandleGet[M any, Msg any](p runtime.Program[M, Msg]) http.HandlerFunc {
-	return HandleGetWith(DefaultRenderer, p)
+// An optional dec may be provided; if non-nil it is called after Init and the
+// resulting Msg is fed through one Update/Cmd cycle before View is called.
+func HandleGet[M any, Msg any](p runtime.Program[M, Msg], dec ...runtime.MsgDecoder[Msg]) http.HandlerFunc {
+	return HandleGetWith(DefaultRenderer, p, dec...)
 }
 
 // HandleGetWith is like HandleGet but uses the provided Renderer instead of DefaultRenderer.
-func HandleGetWith[M any, Msg any](rend Renderer, p runtime.Program[M, Msg]) http.HandlerFunc {
+func HandleGetWith[M any, Msg any](rend Renderer, p runtime.Program[M, Msg], dec ...runtime.MsgDecoder[Msg]) http.HandlerFunc {
 	if rend == nil {
 		panic("web: HandleGetWith called with nil Renderer; call web.SetRenderer before registering routes")
+	}
+	var decoder runtime.MsgDecoder[Msg]
+	if len(dec) > 0 {
+		decoder = dec[0]
 	}
 	runner := runtime.NewRunner(p)
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		model, err := runner.RunInit(ctx, r)
+		model, err := runner.RunInitWithMsg(ctx, r, decoder)
 		if err != nil {
 			http.Error(w, "internal server error: init: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -98,19 +104,21 @@ func isHTMXRequest(r *http.Request) bool {
 //     the program's View as an HTML fragment so HTMX can swap it in-place.
 //   - Normal requests: run the update/cmd loop, then perform a PRG redirect
 //     using Outcome.RedirectTo, the Referer header, or "/" as fallback.
-func HandlePost[M any, Msg any](p runtime.PostProgram[M, Msg]) http.HandlerFunc {
-	return HandlePostWith(DefaultRenderer, p)
+//
+// dec is called on every POST request to decode the request into a Msg.
+func HandlePost[M any, Msg any](p runtime.Program[M, Msg], dec runtime.MsgDecoder[Msg]) http.HandlerFunc {
+	return HandlePostWith(DefaultRenderer, p, dec)
 }
 
 // HandlePostWith is like HandlePost but uses the provided Renderer instead of DefaultRenderer.
-func HandlePostWith[M any, Msg any](rend Renderer, p runtime.PostProgram[M, Msg]) http.HandlerFunc {
+func HandlePostWith[M any, Msg any](rend Renderer, p runtime.Program[M, Msg], dec runtime.MsgDecoder[Msg]) http.HandlerFunc {
 	if rend == nil {
 		panic("web: HandlePostWith called with nil Renderer; call web.SetRenderer before registering routes")
 	}
 	runner := runtime.NewRunner(p)
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		model, outcome, err := runner.RunPostWithModel(ctx, r, p)
+		model, outcome, err := runner.RunPostWithModel(ctx, r, dec)
 		if err != nil {
 			http.Error(w, "internal server error: post: "+err.Error(), http.StatusInternalServerError)
 			return

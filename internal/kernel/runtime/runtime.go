@@ -66,17 +66,10 @@ type Program[M any, Msg any] interface {
 	View(ctx context.Context, model M) templ.Component
 }
 
-// Decoder parses an *http.Request into a Msg for POST handlers.
-// Not all programs need decoding – only those handling POST (or similar) requests.
-type Decoder[Msg any] interface {
-	DecodeMsg(r *http.Request) (Msg, error)
-}
-
-// PostProgram is a Program that also knows how to decode POST requests into messages.
-type PostProgram[M any, Msg any] interface {
-	Program[M, Msg]
-	Decoder[Msg]
-}
+// MsgDecoder decodes an *http.Request into a Msg.
+// Pass one to HandlePost or HandleGet at route-registration time so that
+// programs remain pure state machines with no HTTP awareness.
+type MsgDecoder[Msg any] func(r *http.Request) (Msg, error)
 
 // maxLoopIterations is the maximum number of Update/Cmd cycles allowed per
 // request.  This prevents infinite loops caused by a Cmd producing a Msg that
@@ -109,9 +102,30 @@ func (r *Runner[M, Msg]) RunInit(ctx context.Context, req *http.Request) (M, err
 	return model, err
 }
 
+// RunInitWithMsg is like RunInit but, after draining the initial Cmd, it
+// decodes a Msg from the request using dec and runs one more Update/Cmd cycle.
+// If dec is nil, it behaves identically to RunInit.
+func (r *Runner[M, Msg]) RunInitWithMsg(ctx context.Context, req *http.Request, dec MsgDecoder[Msg]) (M, error) {
+	model, err := r.RunInit(ctx, req)
+	if err != nil || dec == nil {
+		return model, err
+	}
+	msg, err := dec(req)
+	if err != nil {
+		return model, fmt.Errorf("runtime: decode msg: %w", err)
+	}
+	updatedModel, nextCmd, _ := r.Program.Update(ctx, model, msg)
+	model = updatedModel
+	if nextCmd != nil {
+		msgs := nextCmd(ctx)
+		model, _, err = r.drainMsgs(ctx, model, msgs)
+	}
+	return model, err
+}
+
 // RunPostWithModel is like RunPost but also returns the final model so that
 // fragment handlers (e.g. HandleFragment) can call View after the update/cmd loop.
-func (r *Runner[M, Msg]) RunPostWithModel(ctx context.Context, req *http.Request, dec Decoder[Msg]) (M, Outcome, error) {
+func (r *Runner[M, Msg]) RunPostWithModel(ctx context.Context, req *http.Request, dec MsgDecoder[Msg]) (M, Outcome, error) {
 	model, cmd := r.Program.Init(ctx, req)
 	if cmd != nil {
 		initMsgs := cmd(ctx)
@@ -123,7 +137,7 @@ func (r *Runner[M, Msg]) RunPostWithModel(ctx context.Context, req *http.Request
 		}
 	}
 
-	msg, err := dec.DecodeMsg(req)
+	msg, err := dec(req)
 	if err != nil {
 		var zero M
 		return zero, Outcome{}, fmt.Errorf("runtime: decode msg: %w", err)
@@ -144,8 +158,8 @@ func (r *Runner[M, Msg]) RunPostWithModel(ctx context.Context, req *http.Request
 	return model, outcome, nil
 }
 
-// RunPost executes DecodeMsg → Update → Cmd loop and returns the accumulated Outcome.
-func (r *Runner[M, Msg]) RunPost(ctx context.Context, req *http.Request, dec Decoder[Msg]) (Outcome, error) {
+// RunPost executes the decoder → Update → Cmd loop and returns the accumulated Outcome.
+func (r *Runner[M, Msg]) RunPost(ctx context.Context, req *http.Request, dec MsgDecoder[Msg]) (Outcome, error) {
 	model, cmd := r.Program.Init(ctx, req)
 	if cmd != nil {
 		initMsgs := cmd(ctx)
@@ -155,9 +169,10 @@ func (r *Runner[M, Msg]) RunPost(ctx context.Context, req *http.Request, dec Dec
 		if err != nil {
 			return o, err
 		}
+
 	}
 
-	msg, err := dec.DecodeMsg(req)
+	msg, err := dec(req)
 	if err != nil {
 		return Outcome{}, fmt.Errorf("runtime: decode msg: %w", err)
 	}

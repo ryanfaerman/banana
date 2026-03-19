@@ -1,6 +1,9 @@
 package example
 
 import (
+	"fmt"
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 
 	"github.com/ryanfaerman/banana/internal/kernel/access"
@@ -35,5 +38,10 @@ func registerRoutes(r chi.Router) {
 
 	// POST /example/action – also private.
 	postAccess := access.Private()
-	r.With(access.Middleware(postAccess)...).Post("/example/action", web.HandlePost(prog))
+	r.With(access.Middleware(postAccess)...).Post("/example/action", web.HandlePost(prog, func(r *http.Request) (Msg, error) {
+		if err := r.ParseForm(); err != nil {
+			return nil, fmt.Errorf("example: parse form: %w", err)
+		}
+		return ActionSubmitted{Message: r.FormValue("message")}, nil
+	}))
 }

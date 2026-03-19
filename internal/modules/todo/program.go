@@ -10,12 +10,9 @@ package todo
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/a-h/templ"
-	"github.com/go-chi/chi/v5"
 
 	rt "github.com/ryanfaerman/banana/internal/kernel/runtime"
 )
@@ -118,23 +115,6 @@ type Program struct{ Store *Store }
 
 func (p Program) Init(_ context.Context, _ *http.Request) (Model, rt.Cmd[PostMsg]) {
 	return Model{}, nil
-}
-
-// DecodeMsg inspects the request to determine which action to perform:
-//   - POST /todo/{id}/toggle → ToggleRequested (chi "id" URL param is set)
-//   - POST /todo/clear       → ClearRequested  (path ends with "/clear")
-//   - POST /todo             → AddRequested
-func (p Program) DecodeMsg(r *http.Request) (PostMsg, error) {
-	if id := chi.URLParam(r, "id"); id != "" {
-		return ToggleRequested{ID: id}, nil
-	}
-	if strings.HasSuffix(r.URL.Path, "/clear") {
-		return ClearRequested{}, nil
-	}
-	if err := r.ParseForm(); err != nil {
-		return nil, fmt.Errorf("todo: parse form: %w", err)
-	}
-	return AddRequested{Text: r.FormValue("text")}, nil
 }
 
 // Update handles all todo mutations.

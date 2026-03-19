@@ -106,11 +106,3 @@ func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, rt.Cmd[Msg]
 func (p Program) View(_ context.Context, m Model) templ.Component {
 	return Page(m)
 }
-
-// DecodeMsg parses the POST form body into an ActionSubmitted message.
-func (p Program) DecodeMsg(r *http.Request) (Msg, error) {
-	if err := r.ParseForm(); err != nil {
-		return nil, fmt.Errorf("example: parse form: %w", err)
-	}
-	return ActionSubmitted{Message: r.FormValue("message")}, nil
-}
