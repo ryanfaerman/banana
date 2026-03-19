@@ -55,11 +55,14 @@ func (CounterIncremented) isExampleMsg() {}
 // ---------------------------------------------------------------------------
 
 // Program implements tea.Program[Model, Msg] for the example page.
-type Program struct{}
+type Program struct {
+	Store *Store
+}
 
-// Init creates the initial model and sends PageOpened to the update loop.
+// Init loads persisted state from the store and sends PageOpened.
 func (p Program) Init(_ context.Context, _ *http.Request) (Model, tea.Cmd[Msg]) {
-	return Model{}, func(_ context.Context) []Msg {
+	model := p.Store.Load()
+	return model, func(_ context.Context) []Msg {
 		return []Msg{PageOpened{}}
 	}
 }
@@ -89,7 +92,12 @@ func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, tea.Cmd[Msg
 
 	case CounterIncremented:
 		m.Counter++
-		return m, nil, tea.Outcome{}
+		// Persist updated model to the store as a side effect (Cmd).
+		store := p.Store
+		return m, func(_ context.Context) []Msg {
+			store.Save(m)
+			return nil
+		}, tea.Outcome{}
 	}
 	return m, nil, tea.Outcome{}
 }

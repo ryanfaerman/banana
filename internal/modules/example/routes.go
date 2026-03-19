@@ -25,7 +25,7 @@ func registerMenu() {
 }
 
 func registerRoutes(r chi.Router) {
-	prog := Program{}
+	prog := Program{Store: NewStore()}
 
 	// GET /example – private (requires authn); access middleware is applied
 	// per-route so it does not bleed onto other routes.
