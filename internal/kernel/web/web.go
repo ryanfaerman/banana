@@ -1,4 +1,4 @@
-// Package web provides chi-compatible HTTP adapters for kernel Tea programs.
+// Package web provides chi-compatible HTTP adapters for kernel runtime programs.
 // HandleGet renders a page (Init → View wrapped in the kernel shell).
 // HandlePost runs the update/cmd loop and performs a PRG redirect.
 package web
@@ -12,7 +12,7 @@ import (
 	"github.com/a-h/templ"
 
 	"github.com/ryanfaerman/banana/internal/kernel/menu"
-	"github.com/ryanfaerman/banana/internal/kernel/tea"
+	"github.com/ryanfaerman/banana/internal/kernel/runtime"
 	"github.com/ryanfaerman/banana/internal/kernel/ui"
 )
 
@@ -48,13 +48,13 @@ func (rend *Renderer) Render(ctx context.Context, w http.ResponseWriter, r *http
 }
 
 // HandleGet returns an http.HandlerFunc that runs Init → View for the program.
-func HandleGet[M any, Msg any](p tea.Program[M, Msg]) http.HandlerFunc {
+func HandleGet[M any, Msg any](p runtime.Program[M, Msg]) http.HandlerFunc {
 	return HandleGetWith(DefaultRenderer, p)
 }
 
 // HandleGetWith is like HandleGet but uses a custom Renderer.
-func HandleGetWith[M any, Msg any](rend *Renderer, p tea.Program[M, Msg]) http.HandlerFunc {
-	runner := tea.NewRunner(p)
+func HandleGetWith[M any, Msg any](rend *Renderer, p runtime.Program[M, Msg]) http.HandlerFunc {
+	runner := runtime.NewRunner(p)
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		model, err := runner.RunInit(ctx, r)
@@ -72,16 +72,16 @@ func HandleGetWith[M any, Msg any](rend *Renderer, p tea.Program[M, Msg]) http.H
 // HandlePost returns an http.HandlerFunc that runs the update/cmd loop and
 // redirects (PRG).  The program's Outcome.RedirectTo is used if set; otherwise
 // the request's Referer header is used; finally "/" is the fallback.
-func HandlePost[M any, Msg any](p tea.Program[M, Msg]) http.HandlerFunc {
+func HandlePost[M any, Msg any](p runtime.PostProgram[M, Msg]) http.HandlerFunc {
 	return HandlePostWith(DefaultRenderer, p)
 }
 
 // HandlePostWith is like HandlePost but uses a custom Renderer.
-func HandlePostWith[M any, Msg any](rend *Renderer, p tea.Program[M, Msg]) http.HandlerFunc {
-	runner := tea.NewRunner(p)
+func HandlePostWith[M any, Msg any](rend *Renderer, p runtime.PostProgram[M, Msg]) http.HandlerFunc {
+	runner := runtime.NewRunner(p)
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		outcome, err := runner.RunPost(ctx, r)
+		outcome, err := runner.RunPost(ctx, r, p)
 		if err != nil {
 			http.Error(w, "internal server error: post: "+err.Error(), http.StatusInternalServerError)
 			return

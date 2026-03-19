@@ -1,4 +1,4 @@
-// Package tea provides an Elm/Bubble Tea–inspired SSR kernel.
+// Package runtime provides an Elm/Bubble Tea–inspired SSR kernel.
 // A Program is a typed page-level state machine:
 //
 //	Init  → (Model, Cmd)
@@ -7,7 +7,7 @@
 //
 // POST handlers run the update loop, execute commands, and redirect (PRG).
 // GET handlers call Init + View.
-package tea
+package runtime
 
 import (
 	"context"
@@ -64,8 +64,18 @@ type Program[M any, Msg any] interface {
 	Update(ctx context.Context, model M, msg Msg) (M, Cmd[Msg], Outcome)
 	// View renders the model into a templ Component.
 	View(ctx context.Context, model M) templ.Component
-	// DecodeMsg parses an *http.Request into a Msg for POST handlers.
+}
+
+// Decoder parses an *http.Request into a Msg for POST handlers.
+// Not all programs need decoding – only those handling POST (or similar) requests.
+type Decoder[Msg any] interface {
 	DecodeMsg(r *http.Request) (Msg, error)
+}
+
+// PostProgram is a Program that also knows how to decode POST requests into messages.
+type PostProgram[M any, Msg any] interface {
+	Program[M, Msg]
+	Decoder[Msg]
 }
 
 // maxLoopIterations is the maximum number of Update/Cmd cycles allowed per
@@ -100,7 +110,7 @@ func (r *Runner[M, Msg]) RunInit(ctx context.Context, req *http.Request) (M, err
 }
 
 // RunPost executes DecodeMsg → Update → Cmd loop and returns the accumulated Outcome.
-func (r *Runner[M, Msg]) RunPost(ctx context.Context, req *http.Request) (Outcome, error) {
+func (r *Runner[M, Msg]) RunPost(ctx context.Context, req *http.Request, dec Decoder[Msg]) (Outcome, error) {
 	model, cmd := r.Program.Init(ctx, req)
 	if cmd != nil {
 		initMsgs := cmd(ctx)
@@ -112,9 +122,9 @@ func (r *Runner[M, Msg]) RunPost(ctx context.Context, req *http.Request) (Outcom
 		}
 	}
 
-	msg, err := r.Program.DecodeMsg(req)
+	msg, err := dec.DecodeMsg(req)
 	if err != nil {
-		return Outcome{}, fmt.Errorf("tea: decode msg: %w", err)
+		return Outcome{}, fmt.Errorf("runtime: decode msg: %w", err)
 	}
 
 	updatedModel, nextCmd, outcome := r.Program.Update(ctx, model, msg)
@@ -140,7 +150,7 @@ func (r *Runner[M, Msg]) drainMsgs(ctx context.Context, model M, msgs []Msg) (M,
 	iterations := 0
 	for len(queue) > 0 {
 		if iterations >= maxLoopIterations {
-			return model, accumulated, fmt.Errorf("tea: update loop exceeded %d iterations", maxLoopIterations)
+			return model, accumulated, fmt.Errorf("runtime: update loop exceeded %d iterations", maxLoopIterations)
 		}
 		msg := queue[0]
 		queue = queue[1:]

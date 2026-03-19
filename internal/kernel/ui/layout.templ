@@ -42,7 +42,7 @@ templ FlashList(flashes []Flash) {
 	}
 }
 
-// Flash mirrors tea.Flash so the ui package has no import cycle.
+// Flash mirrors runtime.Flash so the ui package has no import cycle.
 type Flash struct {
 	Level   string
 	Message string

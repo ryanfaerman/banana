@@ -1,4 +1,4 @@
-package tea_test
+package runtime_test
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/a-h/templ"
 
-	"github.com/ryanfaerman/banana/internal/kernel/tea"
+	"github.com/ryanfaerman/banana/internal/kernel/runtime"
 )
 
 // ---------------------------------------------------------------------------
@@ -30,20 +30,20 @@ func (doneMsg) isTestMsg() {}
 
 type testProgram struct{}
 
-func (testProgram) Init(_ context.Context, _ *http.Request) (testModel, tea.Cmd[testMsg]) {
+func (testProgram) Init(_ context.Context, _ *http.Request) (testModel, runtime.Cmd[testMsg]) {
 	return testModel{}, nil
 }
 
-func (testProgram) Update(_ context.Context, m testModel, msg testMsg) (testModel, tea.Cmd[testMsg], tea.Outcome) {
+func (testProgram) Update(_ context.Context, m testModel, msg testMsg) (testModel, runtime.Cmd[testMsg], runtime.Outcome) {
 	switch msg.(type) {
 	case incrementMsg:
 		m.count++
 		// produce a doneMsg via a Cmd
-		return m, func(_ context.Context) []testMsg { return []testMsg{doneMsg{value: m.count}} }, tea.Outcome{}
+		return m, func(_ context.Context) []testMsg { return []testMsg{doneMsg{value: m.count}} }, runtime.Outcome{}
 	case doneMsg:
-		return m, nil, tea.Outcome{RedirectTo: "/done"}
+		return m, nil, runtime.Outcome{RedirectTo: "/done"}
 	}
-	return m, nil, tea.Outcome{}
+	return m, nil, runtime.Outcome{}
 }
 
 func (testProgram) View(_ context.Context, _ testModel) templ.Component {
@@ -61,7 +61,7 @@ func (testProgram) DecodeMsg(_ *http.Request) (testMsg, error) {
 // ---------------------------------------------------------------------------
 
 func TestRunInit_noCmd(t *testing.T) {
-	runner := tea.NewRunner[testModel, testMsg](testProgram{})
+	runner := runtime.NewRunner[testModel, testMsg](testProgram{})
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	model, err := runner.RunInit(context.Background(), req)
 	if err != nil {
@@ -73,9 +73,10 @@ func TestRunInit_noCmd(t *testing.T) {
 }
 
 func TestRunPost_updateCmdLoop(t *testing.T) {
-	runner := tea.NewRunner[testModel, testMsg](testProgram{})
+	prog := testProgram{}
+	runner := runtime.NewRunner[testModel, testMsg](prog)
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
-	outcome, err := runner.RunPost(context.Background(), req)
+	outcome, err := runner.RunPost(context.Background(), req, prog)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -88,7 +89,7 @@ func TestRunPost_updateCmdLoop(t *testing.T) {
 func TestBatchCmd(t *testing.T) {
 	cmd1 := func(_ context.Context) []testMsg { return []testMsg{incrementMsg{}} }
 	cmd2 := func(_ context.Context) []testMsg { return []testMsg{incrementMsg{}} }
-	batched := tea.BatchCmd(cmd1, cmd2)
+	batched := runtime.BatchCmd(cmd1, cmd2)
 	msgs := batched(context.Background())
 	if len(msgs) != 2 {
 		t.Errorf("expected 2 messages, got %d", len(msgs))
@@ -96,7 +97,7 @@ func TestBatchCmd(t *testing.T) {
 }
 
 func TestNoCmd(t *testing.T) {
-	cmd := tea.NoCmd[testMsg]()
+	cmd := runtime.NoCmd[testMsg]()
 	if cmd != nil {
 		t.Error("NoCmd should return nil")
 	}

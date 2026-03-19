@@ -15,7 +15,7 @@ import (
 
 	"github.com/a-h/templ"
 
-	"github.com/ryanfaerman/banana/internal/kernel/tea"
+	rt "github.com/ryanfaerman/banana/internal/kernel/runtime"
 )
 
 // ---------------------------------------------------------------------------
@@ -54,13 +54,13 @@ func (CounterIncremented) isExampleMsg() {}
 // Program implementation
 // ---------------------------------------------------------------------------
 
-// Program implements tea.Program[Model, Msg] for the example page.
+// Program implements rt.Program[Model, Msg] for the example page.
 type Program struct {
 	Store *Store
 }
 
 // Init loads persisted state from the store and sends PageOpened.
-func (p Program) Init(_ context.Context, _ *http.Request) (Model, tea.Cmd[Msg]) {
+func (p Program) Init(_ context.Context, _ *http.Request) (Model, rt.Cmd[Msg]) {
 	model := p.Store.Load()
 	return model, func(_ context.Context) []Msg {
 		return []Msg{PageOpened{}}
@@ -69,11 +69,11 @@ func (p Program) Init(_ context.Context, _ *http.Request) (Model, tea.Cmd[Msg]) 
 
 // Update handles messages and returns the updated model, optional next Cmd,
 // and any Outcome (redirect, flashes).
-func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, tea.Cmd[Msg], tea.Outcome) {
+func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, rt.Cmd[Msg], rt.Outcome) {
 	switch msg := msg.(type) {
 	case PageOpened:
 		// nothing to do on initial open
-		return m, nil, tea.Outcome{}
+		return m, nil, rt.Outcome{}
 
 	case ActionSubmitted:
 		m.LastMsg = msg.Message
@@ -81,10 +81,10 @@ func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, tea.Cmd[Msg
 		cmd := func(_ context.Context) []Msg {
 			return []Msg{CounterIncremented{}}
 		}
-		outcome := tea.Outcome{
+		outcome := rt.Outcome{
 			// Redirect to the page itself (could be left empty to use Referer).
 			RedirectTo: "/example",
-			Flashes: []tea.Flash{
+			Flashes: []rt.Flash{
 				{Level: "success", Message: fmt.Sprintf("Submitted: %q", msg.Message)},
 			},
 		}
@@ -97,9 +97,9 @@ func (p Program) Update(_ context.Context, m Model, msg Msg) (Model, tea.Cmd[Msg
 		return m, func(_ context.Context) []Msg {
 			store.Save(m)
 			return nil
-		}, tea.Outcome{}
+		}, rt.Outcome{}
 	}
-	return m, nil, tea.Outcome{}
+	return m, nil, rt.Outcome{}
 }
 
 // View renders the model into a templ Component.
