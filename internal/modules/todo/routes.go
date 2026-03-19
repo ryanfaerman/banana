@@ -31,10 +31,12 @@ func registerRoutes(r chi.Router) {
 	// Full-page GET — rendered inside the application shell via the kernel runtime.
 	r.Get("/todo", web.HandleGet(PageProgram{Store: store}))
 
-	// POST endpoints — web.HandlePost detects the HX-Request header and either
-	// renders the View as an HTML fragment (HTMX) or performs a PRG redirect.
-	r.Post("/todo", web.HandlePost(AddProgram{Store: store}))
-	r.Post("/todo/clear", web.HandlePost(ClearProgram{Store: store}))
-	r.Post("/todo/{id}/toggle", web.HandlePost(ToggleProgram{Store: store}))
+	// POST endpoints — a single Program handles all mutations; web.HandlePost
+	// detects the HX-Request header and either renders the View as an HTML
+	// fragment (HTMX) or performs a PRG redirect.
+	program := Program{Store: store}
+	r.Post("/todo", web.HandlePost(program))
+	r.Post("/todo/clear", web.HandlePost(program))
+	r.Post("/todo/{id}/toggle", web.HandlePost(program))
 }
 
