@@ -5,6 +5,8 @@ package menu
 import (
 	"sort"
 	"sync"
+
+	"github.com/ryanfaerman/banana/internal/kernel/access"
 )
 
 // Item represents a single navigation link.
@@ -15,6 +17,9 @@ type Item struct {
 	Order int
 	// Icon is an optional CSS class or SVG string.
 	Icon string
+	// Access describes who may see this menu item.
+	// The kernel evaluates this before passing items to the renderer.
+	Access access.Access
 }
 
 // Registry holds all registered menu items.

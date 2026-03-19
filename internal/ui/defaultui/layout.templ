@@ -1,11 +1,14 @@
-package ui
+package defaultui
 
 import (
-	"github.com/ryanfaerman/banana/internal/kernel/menu"
+	"github.com/ryanfaerman/banana/internal/kernel/runtime"
+	"github.com/ryanfaerman/banana/internal/kernel/web"
 )
 
-// Shell renders the full app shell: HTML boilerplate, nav, and the page body.
-templ Shell(title string, menus []menu.Item, body templ.Component) {
+// shell renders the full application shell: HTML boilerplate, nav bar, optional
+// flash messages, and the page body.  It is unexported because only the Renderer
+// in this package should call it.
+templ shell(title string, menus []web.MenuItem, body templ.Component, flashes []runtime.Flash) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -29,21 +32,11 @@ templ Shell(title string, menus []menu.Item, body templ.Component) {
 				}
 			</nav>
 			<main>
+				for _, f := range flashes {
+					<div class={ "flash flash-" + f.Level }>{ f.Message }</div>
+				}
 				@body
 			</main>
 		</body>
 	</html>
-}
-
-// FlashList renders a list of flash messages.
-templ FlashList(flashes []Flash) {
-	for _, f := range flashes {
-		<div class={ "flash flash-" + f.Level }>{ f.Message }</div>
-	}
-}
-
-// Flash mirrors runtime.Flash so the ui package has no import cycle.
-type Flash struct {
-	Level   string
-	Message string
 }

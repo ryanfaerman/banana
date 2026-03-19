@@ -17,10 +17,11 @@ func Register(r chi.Router) {
 
 func registerMenu() {
 	menu.Register(menu.Item{
-		ID:    "example",
-		Label: "Example",
-		Href:  "/example",
-		Order: 10,
+		ID:     "example",
+		Label:  "Example",
+		Href:   "/example",
+		Order:  10,
+		Access: access.Private(),
 	})
 }
 

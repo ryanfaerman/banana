@@ -10,7 +10,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/ryanfaerman/banana/internal/kernel/web"
 	"github.com/ryanfaerman/banana/internal/modules/example"
+	"github.com/ryanfaerman/banana/internal/ui/defaultui"
 )
 
 func main() {
@@ -18,6 +20,9 @@ func main() {
 	if addr == "" {
 		addr = ":8080"
 	}
+
+	// Wire the default full-page renderer into the kernel before routes are registered.
+	web.SetRenderer(defaultui.New())
 
 	r := chi.NewRouter()
 
